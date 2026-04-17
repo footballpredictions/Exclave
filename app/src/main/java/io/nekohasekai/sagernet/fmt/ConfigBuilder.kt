@@ -2623,6 +2623,31 @@ fun buildV2RayConfig(
             })
         }
 
+        if (!forTest && routeMode == RouteMode.RULE) {
+            // Mobile carriers often resolve CDN hostnames differently from Wi-Fi.
+            // If user keeps "AsIs", force IP fallback so geoip:ru can still bypass those domains directly.
+            if (routing.domainStrategy == "AsIs") {
+                routing.domainStrategy = "IPIfNonMatch"
+            }
+            routing.rules.add(0, RoutingObject.RuleObject().apply {
+                type = "field"
+                ip = listOf("geoip:ru")
+                outboundTag = TAG_BYPASS
+            })
+            routing.rules.add(0, RoutingObject.RuleObject().apply {
+                type = "field"
+                // geosite/geoip keeps Russian services + related domains more consistent than suffix-only matching.
+                domain = listOf(
+                    "geosite:category-ru",
+                    "domain:.ru",
+                    "domain:.xn--p1ai",
+                    // Major RU marketplaces can serve media from non-.ru CDN aliases.
+                    "domain:ozonusercontent.com",
+                )
+                outboundTag = TAG_BYPASS
+            })
+        }
+
         if (routeMode == RouteMode.DIRECT) {
             routing.rules.add(0, RoutingObject.RuleObject().apply {
                 type = "field"

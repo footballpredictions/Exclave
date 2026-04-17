@@ -36,11 +36,14 @@ import io.nekohasekai.sagernet.ktx.*
 import java.io.BufferedReader
 import java.io.StringReader
 import java.util.Properties
+import java.util.UUID
 
 object DataStore : OnPreferenceDataStoreChangeListener {
 
     val configurationStore = RoomPreferenceDataStore(PublicDatabase.kvPairDao)
     val profileCacheStore = RoomPreferenceDataStore(InMemoryDatabase.kvPairDao)
+    private const val DARK_THEME_MIGRATION_V1 = "ssDefaultDarkThemeAppliedV1"
+    private const val FRAGMENT_DEFAULTS_MIGRATION_V1 = "ssFragmentDefaultsAppliedV1"
 
     fun init() {
         configurationStore.registerChangeListener(this)
@@ -77,6 +80,20 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         if (outboundDomainStrategy != null && outboundDomainStrategy != "AsIs"
             && configurationStore.getString("outboundDomainStrategyForServer") == null) {
             configurationStore.putString("outboundDomainStrategyForServer", outboundDomainStrategy)
+        }
+
+        // One-time migration for existing installs: switch legacy pink theme to dark defaults.
+        if (configurationStore.getBoolean(DARK_THEME_MIGRATION_V1) != true) {
+            appTheme = 20
+            nightTheme = 1
+            configurationStore.putBoolean(DARK_THEME_MIGRATION_V1, true)
+        }
+
+        // One-time migration: enable fragmentation with combined TLS+TCP method.
+        if (configurationStore.getBoolean(FRAGMENT_DEFAULTS_MIGRATION_V1) != true) {
+            enableFragment = true
+            fragmentMethod = TLS_FRAGMENTATION_METHOD.TLS_RECORD_FRAGMENTATION_AND_TCP_SEGMENTATION
+            configurationStore.putBoolean(FRAGMENT_DEFAULTS_MIGRATION_V1, true)
         }
     }
 
@@ -128,8 +145,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         return groups.find { it.type == GroupType.BASIC }!!.id
     }
 
-    var appTheme by configurationStore.int(Key.APP_THEME)
-    var nightTheme by configurationStore.stringToInt(Key.NIGHT_THEME)
+    // Default to the black palette and forced dark mode for fresh installs.
+    var appTheme by configurationStore.int(Key.APP_THEME) { 20 }
+    var nightTheme by configurationStore.stringToInt(Key.NIGHT_THEME) { 1 }
     var serviceMode by configurationStore.string(Key.SERVICE_MODE) { Key.MODE_VPN }
 
     var domainStrategy by configurationStore.string(Key.DOMAIN_STRATEGY) { "AsIs" }
@@ -173,9 +191,11 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var useIECUnit by configurationStore.boolean(Key.USE_IEC_UNIT)
     var queryAllPackagesAlternativeMethod by configurationStore.boolean(Key.QUERY_ALL_PACKAGES_ALTERNATIVE_METHOD)
 
-    var enableFragment by configurationStore.boolean(Key.ENABLE_FRAGMENT)
+    var enableFragment by configurationStore.boolean(Key.ENABLE_FRAGMENT) { true }
     var enableFragmentForDirect by configurationStore.boolean(Key.ENABLE_FRAGMENT_FOR_DIRECT)
-    var fragmentMethod by configurationStore.stringToInt(Key.FRAGMENT_METHOD)
+    var fragmentMethod by configurationStore.stringToInt(Key.FRAGMENT_METHOD) {
+        TLS_FRAGMENTATION_METHOD.TLS_RECORD_FRAGMENTATION_AND_TCP_SEGMENTATION
+    }
     var realityDisableX25519Mlkem768 by configurationStore.boolean(Key.REALITY_DISABLE_X25519MLKEM768)
     var grpcServiceNameCompat by configurationStore.boolean(Key.GRPC_SERVICE_NAME_COMPAT)
     var profileSecurityAdvisory by configurationStore.boolean(Key.PROFILE_SECURITY_ADVISORY) { true }
@@ -210,6 +230,13 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         if (configurationStore.getString(Key.TRANSPROXY_PORT) == null) {
             transproxyPort = transproxyPort
         }
+        // Prevent unauthenticated local SOCKS exposure on fresh installs/migrations.
+        if (configurationStore.getString(Key.SOCKS_USERNAME).isNullOrBlank()) {
+            socksUsername = buildLocalInboundToken("ssu")
+        }
+        if (configurationStore.getString(Key.SOCKS_PASSWORD).isNullOrBlank()) {
+            socksPassword = buildLocalInboundToken("ssp")
+        }
         if (configurationStore.getString(Key.DNS_HOSTS) == null) {
             hosts = hosts
         }
@@ -233,6 +260,11 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         configurationStore.putString(key, "$value")
     }
 
+    private fun buildLocalInboundToken(prefix: String): String {
+        val token = UUID.randomUUID().toString().replace("-", "").take(20)
+        return "${prefix}_${token}"
+    }
+
     var enableVPNInterfaceIPv6Address by configurationStore.boolean(Key.ENABLE_VPN_INTERFACE_IPV6_ADDRESS)
 
     var meteredNetwork by configurationStore.boolean(Key.METERED_NETWORK)
@@ -246,7 +278,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var requireSocks by configurationStore.boolean(Key.REQUIRE_SOCKS) { true }
     var socksUsername by configurationStore.string(Key.SOCKS_USERNAME)
     var socksPassword by configurationStore.string(Key.SOCKS_PASSWORD)
-    var socksUDP by configurationStore.boolean(Key.SOCKS_UDP) { true }
+    var socksUDP by configurationStore.boolean(Key.SOCKS_UDP) { false }
     var requireHttp by configurationStore.boolean(Key.REQUIRE_HTTP) { false }
     var httpUsername by configurationStore.string(Key.HTTP_USERNAME)
     var httpPassword by configurationStore.string(Key.HTTP_PASSWORD)

@@ -25,8 +25,13 @@ import io.nekohasekai.sagernet.R
 enum class PluginEntry(
     val pluginId: String,
     @StringRes val nameId: Int,
+    val downloadUrl: String? = null,
 ) {
-    NaiveProxy("naive-plugin", R.string.action_naive),
+    NaiveProxy(
+        "naive-plugin",
+        R.string.action_naive,
+        "https://github.com/MatsuriDayo/plugins/releases",
+    ),
     ShadowQUIC("shadowquic-plugin", R.string.action_shadowquic);
 
     companion object {

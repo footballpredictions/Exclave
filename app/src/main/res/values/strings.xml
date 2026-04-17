@@ -220,6 +220,7 @@
     <string name="action_export_err">Failed to export.</string>
     <string name="action_import_msg">Successfully import!</string>
     <string name="action_import_err">Failed to import.</string>
+    <string name="action_download">Download</string>
     <string name="file_manager_missing">Your device lacks an Android standard file selector, please install one, such as Material Files.</string>
     <!-- share -->
     <!-- profile -->

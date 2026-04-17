@@ -347,19 +347,34 @@ class MainActivity : ThemedActivity(),
     }
 
     override fun missingPlugin(profileName: String, pluginName: String) {
-        if (pluginName.startsWith("shadowsocks-")) pluginName.substringAfter("shadowsocks-") else pluginName
-        val pluginEntity = PluginEntry.find(pluginName)
+        val normalizedPluginName = if (pluginName.startsWith("shadowsocks-")) {
+            pluginName.substringAfter("shadowsocks-")
+        } else {
+            pluginName
+        }
+        val pluginEntity = PluginEntry.find(normalizedPluginName)
         if (pluginEntity == null) {
-            snackbar(getString(R.string.plugin_unknown, pluginName)).show()
+            snackbar(getString(R.string.plugin_unknown, normalizedPluginName)).show()
             return
         }
 
-        MaterialAlertDialogBuilder(this).setTitle(R.string.missing_plugin)
+        val dialog = MaterialAlertDialogBuilder(this).setTitle(R.string.missing_plugin)
             .setMessage(
                 getString(
                     R.string.profile_requiring_plugin, profileName, getString(pluginEntity.nameId)
                 )
-            ).show()
+            )
+        pluginEntity.downloadUrl?.let { url ->
+            dialog.setPositiveButton(R.string.action_download) { _, _ ->
+                runCatching {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                }.onFailure {
+                    snackbar(it.readableMessage).show()
+                }
+            }
+            dialog.setNegativeButton(android.R.string.cancel, null)
+        }
+        dialog.show()
     }
 
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
